@@ -34,6 +34,17 @@ APK 一律用 debug keystore `~/.android/debug.keystore` 簽章（`app/build.gra
 
 注意：tag 的版本號要大於 app 的 `versionName`，APK 的 `versionCode` 也必須比已安裝的大，否則 app 會拒絕安裝。
 
+## 快速連拍與背景合成（v2.4）
+
+- 相機同時開著全解析度的 YUV 串流（ImageAnalysis），按下快門後直接取串流中的連續影格（約 30 fps），一般模式 6 張、夜景 10 張、超解析 10/12 張（隔張取）。
+- HDR 用 Camera2 手動曝光（快門/ISO）拍 0 / -2 / +2 EV，依每張的拍攝結果（CaptureResult）挑出曝光正確的影格，不再固定等待 350 ms。
+- 拍完立刻顯示「可以放下手機了」，對齊與合成在 `ProcessingQueue` 一次一張在背景處理，`ProcessingService`（前景服務）讓 app 離開畫面時也能做完。
+- 若裝置無法同時輸出接近全解析度的串流，會自動改用舊的逐張 ImageCapture 方式。
+
+## App 內相簿
+
+左下角縮圖打開 `GalleryActivity`：列出 MediaStore 中 `Pictures/StackCam` 的照片（新到舊），左右滑動、雙擊或兩指縮放、分享、刪除（自己拍的直接刪；不是本 app 建立的會跳系統確認）。
+
 ## 發佈新版流程
 
 1. 修改 `app/build.gradle.kts`：`versionName = "X.Y"`、`versionCode` +1。

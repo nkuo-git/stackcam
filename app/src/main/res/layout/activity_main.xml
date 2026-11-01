@@ -24,6 +24,14 @@
         android:foreground="?android:attr/selectableItemBackground"
         android:textColor="#FFFFFF" android:textSize="12sp" android:text="檢查更新" />
 
+    <TextView android:id="@+id/holdHint"
+        android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:layout_gravity="center" android:background="@drawable/hint_bg"
+        android:paddingStart="24dp" android:paddingEnd="24dp"
+        android:paddingTop="14dp" android:paddingBottom="14dp" android:gravity="center"
+        android:textColor="#FFFFFF" android:textSize="22sp" android:textStyle="bold"
+        android:visibility="gone" />
+
     <LinearLayout
         android:layout_width="match_parent" android:layout_height="wrap_content"
         android:layout_gravity="bottom" android:orientation="vertical"
@@ -71,9 +79,35 @@
             android:layout_width="240dp" android:layout_height="wrap_content"
             android:layout_marginTop="6dp" android:max="100" android:visibility="invisible"/>
 
-        <ImageButton android:id="@+id/shutter"
-            android:layout_width="80dp" android:layout_height="80dp"
-            android:layout_marginTop="10dp" android:background="@drawable/shutter"
-            android:contentDescription="快門"/>
+        <FrameLayout
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="10dp">
+
+            <ImageView android:id="@+id/thumb"
+                android:layout_width="60dp" android:layout_height="60dp"
+                android:layout_gravity="start|center_vertical" android:layout_marginStart="24dp"
+                android:background="@drawable/thumb_bg" android:padding="2dp"
+                android:scaleType="centerCrop" android:clickable="true" android:focusable="true"
+                android:contentDescription="查看照片" />
+
+            <ImageButton android:id="@+id/shutter"
+                android:layout_width="80dp" android:layout_height="80dp"
+                android:layout_gravity="center" android:background="@drawable/shutter"
+                android:contentDescription="快門"/>
+
+            <LinearLayout android:id="@+id/queueBox"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:layout_gravity="end|center_vertical" android:layout_marginEnd="16dp"
+                android:orientation="vertical" android:gravity="center_horizontal"
+                android:visibility="invisible">
+                <ProgressBar
+                    style="?android:attr/progressBarStyleSmall"
+                    android:layout_width="24dp" android:layout_height="24dp" />
+                <TextView android:id="@+id/queueText"
+                    android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:textColor="#FFC107" android:textSize="12sp" android:text="處理中 1" />
+            </LinearLayout>
+        </FrameLayout>
     </LinearLayout>
 </FrameLayout>

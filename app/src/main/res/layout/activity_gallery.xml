@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:background="#000000">
+
+    <androidx.viewpager2.widget.ViewPager2
+        android:id="@+id/pager"
+        android:layout_width="match_parent" android:layout_height="match_parent" />
+
+    <TextView android:id="@+id/empty"
+        android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:layout_gravity="center" android:gravity="center"
+        android:textColor="#CCCCCC" android:textSize="16sp" android:visibility="gone"
+        android:text="還沒有 StackCam 拍的照片" />
+
+    <LinearLayout android:id="@+id/topBar"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_gravity="top" android:orientation="horizontal"
+        android:gravity="center_vertical" android:background="#99000000"
+        android:paddingTop="8dp" android:paddingBottom="8dp">
+        <TextView android:id="@+id/back"
+            android:layout_width="wrap_content" android:layout_height="48dp"
+            android:gravity="center" android:paddingStart="16dp" android:paddingEnd="16dp"
+            android:clickable="true" android:focusable="true"
+            android:foreground="?android:attr/selectableItemBackground"
+            android:textColor="#FFFFFF" android:textSize="17sp" android:text="‹ 返回相機" />
+        <TextView android:id="@+id/counter"
+            android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
+            android:gravity="end" android:paddingEnd="16dp"
+            android:textColor="#FFFFFF" android:textSize="14sp" />
+    </LinearLayout>
+
+    <LinearLayout android:id="@+id/bottomBar"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_gravity="bottom" android:orientation="vertical"
+        android:background="#99000000" android:paddingBottom="24dp" android:paddingTop="8dp">
+        <TextView android:id="@+id/info"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:gravity="center" android:textColor="#BBBBBB" android:textSize="12sp" />
+        <TextView android:id="@+id/processing"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:gravity="center" android:textColor="#FFC107" android:textSize="13sp"
+            android:visibility="gone" />
+        <LinearLayout
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:layout_marginTop="6dp">
+            <TextView android:id="@+id/share"
+                android:layout_width="0dp" android:layout_weight="1" android:layout_height="52dp"
+                android:gravity="center" android:clickable="true" android:focusable="true"
+                android:foreground="?android:attr/selectableItemBackground"
+                android:textColor="#FFFFFF" android:textSize="16sp" android:text="分享" />
+            <TextView android:id="@+id/delete"
+                android:layout_width="0dp" android:layout_weight="1" android:layout_height="52dp"
+                android:gravity="center" android:clickable="true" android:focusable="true"
+                android:foreground="?android:attr/selectableItemBackground"
+                android:textColor="#FF6E6E" android:textSize="16sp" android:text="刪除" />
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>

@@ -9,8 +9,8 @@ android {
         applicationId = "com.nick.stackcam"
         minSdk = 26
         targetSdk = 33
-        versionCode = 5
-        versionName = "2.3"
+        versionCode = 6
+        versionName = "2.4"
     }
     // Always sign with the same debug keystore so new APKs install over old ones (a backup lives in
     // /workspace/keystore-backup/debug.keystore; restore it to ~/.android/ if this machine is rebuilt).
@@ -45,6 +45,8 @@ dependencies {
     implementation("androidx.camera:camera-camera2:$camerax")
     implementation("androidx.camera:camera-lifecycle:$camerax")
     implementation("androidx.camera:camera-view:$camerax")
+    implementation("androidx.viewpager2:viewpager2:1.1.0")
+    implementation("androidx.recyclerview:recyclerview:1.3.2")
 }
 dependencies {
     testImplementation("junit:junit:4.13.2")
