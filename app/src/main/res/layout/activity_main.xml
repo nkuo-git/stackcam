@@ -15,6 +15,15 @@
         android:textColor="#FFC107" android:textSize="16sp" android:textStyle="bold"
         android:visibility="gone" android:text="2x" />
 
+    <TextView android:id="@+id/updateButton"
+        android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:layout_gravity="top|end" android:layout_marginTop="12dp" android:layout_marginEnd="12dp"
+        android:background="#99000000" android:paddingStart="10dp" android:paddingEnd="10dp"
+        android:paddingTop="6dp" android:paddingBottom="6dp" android:minHeight="32dp"
+        android:gravity="center" android:clickable="true" android:focusable="true"
+        android:foreground="?android:attr/selectableItemBackground"
+        android:textColor="#FFFFFF" android:textSize="12sp" android:text="檢查更新" />
+
     <LinearLayout
         android:layout_width="match_parent" android:layout_height="wrap_content"
         android:layout_gravity="bottom" android:orientation="vertical"

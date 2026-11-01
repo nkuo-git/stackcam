@@ -63,6 +63,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var zoomGroup: RadioGroup
     private lateinit var modeHint: TextView
     private lateinit var zoomBadge: TextView
+    private lateinit var updateUi: UpdateUi
 
     private enum class Mode { NORMAL, NIGHT, HDR, SUPERRES }
 
@@ -93,6 +94,8 @@ class MainActivity : AppCompatActivity() {
         zoomGroup = findViewById(R.id.zoomGroup)
         modeHint = findViewById(R.id.modeHint)
         zoomBadge = findViewById(R.id.zoomBadge)
+        updateUi = UpdateUi(this, findViewById(R.id.updateButton))
+        updateUi.init()
 
         shutter.setOnClickListener { onShutter() }
         modeGroup.setOnCheckedChangeListener { _, _ -> updateModeUi() }
@@ -352,7 +355,7 @@ class MainActivity : AppCompatActivity() {
         exif.setAttribute(ExifInterface.TAG_OFFSET_TIME_ORIGINAL, tz)
         exif.setAttribute(ExifInterface.TAG_MAKE, Build.MANUFACTURER)
         exif.setAttribute(ExifInterface.TAG_MODEL, Build.MODEL)
-        exif.setAttribute(ExifInterface.TAG_SOFTWARE, "StackCam 2.0")
+        exif.setAttribute(ExifInterface.TAG_SOFTWARE, "StackCam ${BuildConfig.VERSION_NAME}")
         exif.setAttribute(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL.toString())
         exif.setAttribute(ExifInterface.TAG_PIXEL_X_DIMENSION, width.toString())
         exif.setAttribute(ExifInterface.TAG_PIXEL_Y_DIMENSION, height.toString())
@@ -392,6 +395,11 @@ class MainActivity : AppCompatActivity() {
             MediaScannerConnection.scanFile(this, arrayOf(file.absolutePath), arrayOf("image/jpeg"), null)
             Uri.fromFile(file)
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        updateUi.onResume()
     }
 
     override fun onDestroy() {

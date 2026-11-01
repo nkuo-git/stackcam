@@ -1,5 +1,22 @@
+# Gradle / Android build outputs
 build/
 .gradle/
+.kotlin/
+*.apk
+*.aab
+output-metadata.json
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Local machine config
 local.properties
+
+# Signing keys never go into the (public) repo
+*.keystore
+*.jks
+
+# IDE
 *.iml
 .idea/
+.DS_Store

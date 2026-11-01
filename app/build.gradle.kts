@@ -9,10 +9,22 @@ android {
         applicationId = "com.nick.stackcam"
         minSdk = 26
         targetSdk = 33
-        versionCode = 2
-        versionName = "2.0"
+        versionCode = 3
+        versionName = "2.1"
     }
+    // Always sign with the same debug keystore so new APKs install over old ones (a backup lives in
+    // /workspace/keystore-backup/debug.keystore; restore it to ~/.android/ if this machine is rebuilt).
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file(System.getProperty("user.home") + "/.android/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+    buildFeatures { buildConfig = true }
     buildTypes {
+        debug { signingConfig = signingConfigs.getByName("debug") }
         release { isMinifyEnabled = false }
     }
     compileOptions {
@@ -34,4 +46,8 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:$camerax")
     implementation("androidx.camera:camera-view:$camerax")
 }
-dependencies { testImplementation("junit:junit:4.13.2") }
+dependencies {
+    testImplementation("junit:junit:4.13.2")
+    // Real org.json on the JVM (Android's built-in copy is only a stub in unit tests).
+    testImplementation("org.json:json:20240303")
+}
