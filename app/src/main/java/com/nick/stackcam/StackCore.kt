@@ -215,6 +215,46 @@ class Merger(val w: Int, val h: Int, private val ref: IntArray, private val t1: 
 }
 
 object Sharpen {
+    /**
+     * Unsharp mask with a separable Gaussian blur of the given [sigma] (pixels).
+     * Uses one temporary IntArray of the image size.
+     */
+    fun unsharpGauss(px: IntArray, w: Int, h: Int, sigma: Float, amount: Float) {
+        val r = kotlin.math.max(1, kotlin.math.ceil(2.5f * sigma).toInt())
+        val k = FloatArray(2 * r + 1) { val d = (it - r).toFloat(); kotlin.math.exp(-d * d / (2f * sigma * sigma)) }
+        val ks = k.sum(); for (i in k.indices) k[i] /= ks
+        val tmp = IntArray(w * h)
+        for (y in 0 until h) {
+            val row = y * w
+            for (x in 0 until w) {
+                var sr = 0f; var sg = 0f; var sb = 0f
+                for (j in -r..r) {
+                    val c = px[row + (x + j).coerceIn(0, w - 1)]
+                    val kv = k[j + r]
+                    sr += kv * ((c shr 16) and 0xFF); sg += kv * ((c shr 8) and 0xFF); sb += kv * (c and 0xFF)
+                }
+                tmp[row + x] = ((sr + 0.5f).toInt() shl 16) or ((sg + 0.5f).toInt() shl 8) or (sb + 0.5f).toInt()
+            }
+        }
+        for (y in 0 until h) {
+            for (x in 0 until w) {
+                var sr = 0f; var sg = 0f; var sb = 0f
+                for (j in -r..r) {
+                    val c = tmp[(y + j).coerceIn(0, h - 1) * w + x]
+                    val kv = k[j + r]
+                    sr += kv * ((c shr 16) and 0xFF); sg += kv * ((c shr 8) and 0xFF); sb += kv * (c and 0xFF)
+                }
+                val i = y * w + x
+                val o = px[i]
+                val vr = (o shr 16) and 0xFF; val vg = (o shr 8) and 0xFF; val vb = o and 0xFF
+                val nr = (vr + amount * (vr - sr) + 0.5f).toInt().coerceIn(0, 255)
+                val ng = (vg + amount * (vg - sg) + 0.5f).toInt().coerceIn(0, 255)
+                val nb = (vb + amount * (vb - sb) + 0.5f).toInt().coerceIn(0, 255)
+                px[i] = (0xFF shl 24) or (nr shl 16) or (ng shl 8) or nb
+            }
+        }
+    }
+
     /** In-place unsharp mask with a 3x3 Gaussian blur. amount ~0.3..0.8 */
     fun unsharp(px: IntArray, w: Int, h: Int, amount: Float) {
         if (w < 3 || h < 3) return
