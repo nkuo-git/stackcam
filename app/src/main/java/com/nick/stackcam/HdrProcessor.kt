@@ -30,6 +30,25 @@ object BitmapUtil {
         return Gray.fromArgb(px, w, h)
     }
 
+    /** Mean luma (0..255) of [bmp], reading every 8th row and every 4th pixel. */
+    fun meanLuma(bmp: Bitmap, recycle: Boolean = false): Double {
+        try {
+            val w = bmp.width; val h = bmp.height
+            if (w <= 0 || h <= 0) return 0.0
+            val row = IntArray(w)
+            var sum = 0.0; var rows = 0
+            var y = 0
+            while (y < h) {
+                bmp.getPixels(row, 0, w, 0, y, w, 1)
+                sum += ImageChecks.meanLuma(row, 4); rows++
+                y += 8
+            }
+            return sum / rows
+        } finally {
+            if (recycle) bmp.recycle()
+        }
+    }
+
     /** Builds an upright bitmap from ARGB pixels. */
     fun toUpright(px: IntArray, w: Int, h: Int, rotationDegrees: Int): Bitmap {
         val result = Bitmap.createBitmap(px, w, h, Bitmap.Config.ARGB_8888)

@@ -63,44 +63,49 @@ object CaptureCore {
     }
 
     /**
-     * Converts YUV_420_888 planes into an NV21 byte array (Y plane then interleaved V/U).
-     * Handles any row stride / pixel stride, reading whole rows in bulk for speed.
+     * Converts YUV_420_888 planes into an NV21 byte array (Y plane then interleaved V/U) of [w] x [h],
+     * starting at ([cropLeft], [cropTop]) of the planes (the ImageProxy crop rect; must be even).
+     * Handles any row stride / pixel stride, including the real-device layouts where the last row
+     * of a plane is shorter than its row stride and U/V are views into one interleaved buffer.
      */
     fun toNv21(
         w: Int, h: Int,
         y: ByteBuffer, yRowStride: Int, yPixelStride: Int,
         u: ByteBuffer, v: ByteBuffer, uvRowStride: Int, uvPixelStride: Int,
         out: ByteArray = ByteArray(w * h * 3 / 2),
+        cropLeft: Int = 0, cropTop: Int = 0,
     ): ByteArray {
+        require(w > 0 && h > 0) { "bad size ${w}x$h" }
         require(out.size >= w * h * 3 / 2)
-        y.rewind(); u.rewind(); v.rewind()
+        require(cropLeft % 2 == 0 && cropTop % 2 == 0) { "crop offset must be even" }
+        val ys = y.duplicate().also { it.clear() }
+        val us = u.duplicate().also { it.clear() }
+        val vs = v.duplicate().also { it.clear() }
         var pos = 0
-        if (yPixelStride == 1) {
-            for (row in 0 until h) {
-                y.position(row * yRowStride)
-                y.get(out, pos, w)
+        val yNeed = (w - 1) * yPixelStride + 1
+        val rowBuf = ByteArray(yNeed)
+        for (row in 0 until h) {
+            val start = (row + cropTop) * yRowStride + cropLeft * yPixelStride
+            require(start + yNeed <= ys.limit()) { "Y plane too small: row $row" }
+            ys.position(start)
+            if (yPixelStride == 1) {
+                ys.get(out, pos, w)
                 pos += w
-            }
-        } else {
-            val rowBuf = ByteArray(yRowStride)
-            for (row in 0 until h) {
-                val start = row * yRowStride
-                y.position(start)
-                val n = min(yRowStride, y.limit() - start)
-                y.get(rowBuf, 0, n)
+            } else {
+                ys.get(rowBuf, 0, yNeed)
                 for (col in 0 until w) out[pos++] = rowBuf[col * yPixelStride]
             }
         }
         val cw = w / 2
         val ch = h / 2
-        val uRow = ByteArray(uvRowStride)
-        val vRow = ByteArray(uvRowStride)
+        val cNeed = (cw - 1) * uvPixelStride + 1
+        val uRow = ByteArray(cNeed)
+        val vRow = ByteArray(cNeed)
         for (row in 0 until ch) {
-            val start = row * uvRowStride
-            val un = min(uvRowStride, u.limit() - start)
-            val vn = min(uvRowStride, v.limit() - start)
-            u.position(start); u.get(uRow, 0, un)
-            v.position(start); v.get(vRow, 0, vn)
+            val start = (row + cropTop / 2) * uvRowStride + (cropLeft / 2) * uvPixelStride
+            require(start + cNeed <= us.limit() && start + cNeed <= vs.limit()) { "UV plane too small: row $row" }
+            us.position(start); us.get(uRow, 0, cNeed)
+            vs.position(start); vs.get(vRow, 0, cNeed)
             var idx = 0
             for (col in 0 until cw) {
                 out[pos++] = vRow[idx]
@@ -108,7 +113,6 @@ object CaptureCore {
                 idx += uvPixelStride
             }
         }
-        y.rewind(); u.rewind(); v.rewind()
         return out
     }
 

@@ -7,8 +7,10 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
+import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.IntentSenderRequest
@@ -206,7 +208,7 @@ class GalleryActivity : AppCompatActivity() {
         }
     }
 
-    private inner class Holder(val view: ZoomImageView) : RecyclerView.ViewHolder(view) {
+    private inner class Holder(val root: FrameLayout, val view: ZoomImageView, val status: TextView) : RecyclerView.ViewHolder(root) {
         var job: Job? = null
     }
 
@@ -214,22 +216,49 @@ class GalleryActivity : AppCompatActivity() {
         override fun getItemCount() = photos.size
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
+            val root = FrameLayout(parent.context)
+            root.layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
             val v = ZoomImageView(parent.context)
-            v.layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+            v.layoutParams = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
             v.onSingleTap = { toggleBars() }
-            return Holder(v)
+            val t = TextView(parent.context).apply {
+                layoutParams = FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER,
+                )
+                gravity = Gravity.CENTER
+                setTextColor(0xFFCCCCCC.toInt())
+                textSize = 15f
+                setPadding(48, 0, 48, 0)
+            }
+            root.addView(v)
+            root.addView(t)
+            return Holder(root, v, t)
         }
 
         override fun onBindViewHolder(holder: Holder, position: Int) {
             holder.job?.cancel()
             holder.view.setImageBitmap(null)
+            holder.status.visibility = View.VISIBLE
+            holder.status.text = "載入中…"
             val uri = photos[position].uri
             val maxSide = maxOf(resources.displayMetrics.widthPixels, resources.displayMetrics.heightPixels) * 3 / 2
             holder.job = lifecycleScope.launch {
+                var error: String? = null
                 val bmp = withContext(Dispatchers.IO) {
-                    try { PhotoStore.load(this@GalleryActivity, uri, maxSide.coerceIn(1600, 3200)) } catch (_: Throwable) { null }
+                    try {
+                        PhotoStore.load(this@GalleryActivity, uri, maxSide.coerceIn(1600, 3200))
+                    } catch (t: Throwable) {
+                        error = t.message ?: t.javaClass.simpleName
+                        // Better a smaller preview than a black page.
+                        PhotoStore.thumbnail(this@GalleryActivity, uri, 1024)
+                    }
                 }
-                if (bmp != null) holder.view.setImageBitmap(bmp)
+                if (bmp != null) {
+                    holder.view.setImageBitmap(bmp)
+                    holder.status.visibility = View.GONE
+                } else {
+                    holder.status.text = "無法顯示這張照片${error?.let { "\n（$it）" } ?: ""}"
+                }
             }
         }
 

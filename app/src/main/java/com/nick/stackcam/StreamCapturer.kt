@@ -42,6 +42,7 @@ class StreamCapturer {
         private set
     @Volatile private var sink: Channel<RawFrame>? = null
     /** Rejects frames whose (already known) capture result is unwanted, before the costly copy. */
+    private var blackSkipped = 0
     @Volatile private var preFilter: ((Meta) -> Boolean)? = null
 
     val captureCallback = object : CameraCaptureSession.CaptureCallback() {
@@ -75,12 +76,25 @@ class StreamCapturer {
             val known = metas[image.imageInfo.timestamp]
             if (f != null && known != null && !f(known)) return
             val p = image.planes
+            // Only the crop rect is valid image content; keep offsets/sizes even for 4:2:0 chroma.
+            val crop = image.cropRect
+            val left = (crop.left.coerceIn(0, image.width - 2)) and 1.inv()
+            val top = (crop.top.coerceIn(0, image.height - 2)) and 1.inv()
+            val cw = (minOf(crop.width(), image.width - left)) and 1.inv()
+            val chh = (minOf(crop.height(), image.height - top)) and 1.inv()
+            val fw = if (cw >= 2) cw else image.width and 1.inv()
+            val fh = if (chh >= 2) chh else image.height and 1.inv()
             val nv21 = CaptureCore.toNv21(
-                image.width, image.height,
+                fw, fh,
                 p[0].buffer, p[0].rowStride, p[0].pixelStride,
                 p[1].buffer, p[2].buffer, p[1].rowStride, p[1].pixelStride,
+                cropLeft = if (cw >= 2) left else 0, cropTop = if (chh >= 2) top else 0,
             )
-            ch.trySend(RawFrame(nv21, image.width, image.height, image.imageInfo.rotationDegrees, image.imageInfo.timestamp))
+            // A pitch-black frame while the stream is otherwise live means the camera wasn't
+            // delivering real content yet (e.g. right after a reconfigure): skip it.
+            if (ImageChecks.meanLumaNv21(nv21, fw, fh, 997) < 0.5 && blackSkipped < 15) { blackSkipped++; return }
+            blackSkipped = 0
+            ch.trySend(RawFrame(nv21, fw, fh, image.imageInfo.rotationDegrees, image.imageInfo.timestamp))
         } catch (oom: OutOfMemoryError) {
             ch?.close(IllegalStateException("記憶體不足"))
         } catch (e: Exception) {

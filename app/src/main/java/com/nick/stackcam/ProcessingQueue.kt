@@ -121,12 +121,29 @@ object ProcessingQueue {
     private fun process(app: Context, job: CaptureJob) {
         val n = job.frames.size
         val report: (Int, String) -> Unit = { p, msg -> _state.update { it.copy(progress = p, message = msg) } }
-        val bitmap = when (job.mode) {
+        // Keep the first frame (metered exposure, also in HDR) as a safety net; SR empties the list.
+        val refJpeg = job.frames.firstOrNull()
+        var bitmap = when (job.mode) {
             CaptureCore.Mode.HDR -> HdrProcessor(report).process(job.frames, job.groups, job.rotation)
             CaptureCore.Mode.SUPERRES -> SuperResProcessor(job.zoom, report).process(job.frames, job.rotation)
             else -> StackProcessor(job.mode == CaptureCore.Mode.NIGHT, report).process(job.frames, job.rotation)
         }
         job.frames.clear()
+        var fellBack = false
+        if (refJpeg != null && refJpeg.isNotEmpty()) {
+            val mergedMean = BitmapUtil.meanLuma(bitmap)
+            if (mergedMean < 12.0) {
+                // Only decode the reference when the result is suspiciously dark.
+                val refMean = try { BitmapUtil.meanLuma(BitmapUtil.decode(refJpeg, 8), recycle = true) } catch (_: Throwable) { 0.0 }
+                if (ImageChecks.mergedLooksBroken(mergedMean, refMean)) {
+                    report(96, "合成結果異常，改存原始影格…")
+                    val (px, w, h) = BitmapUtil.pixels(refJpeg, 1)
+                    bitmap.recycle()
+                    bitmap = BitmapUtil.toUpright(px, w, h, job.rotation)
+                    fellBack = true
+                }
+            }
+        }
         report(97, "儲存中…")
         val tag = when (job.mode) {
             CaptureCore.Mode.NORMAL -> "Stack"
@@ -141,6 +158,7 @@ object ProcessingQueue {
             CaptureCore.Mode.NIGHT -> "夜景，$n 張疊合"
             else -> "$n 張疊合"
         }
-        _state.update { it.copy(lastSaved = uri, savedSerial = it.savedSerial + 1, lastResult = "已儲存（$what）") }
+        val result = if (fellBack) "已儲存（合成異常，改存單張原始影格）" else "已儲存（$what）"
+        _state.update { it.copy(lastSaved = uri, savedSerial = it.savedSerial + 1, lastResult = result) }
     }
 }

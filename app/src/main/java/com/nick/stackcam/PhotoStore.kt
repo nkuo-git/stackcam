@@ -136,19 +136,35 @@ object PhotoStore {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             context.contentResolver.loadThumbnail(uri, Size(sizePx, sizePx), null)
         } else load(context, uri, sizePx)
-    } catch (_: Exception) { null }
+    } catch (_: Throwable) { null }
 
-    /** Decodes [uri] so its longer side is at most about [maxSide] pixels, upright. */
-    fun load(context: Context, uri: Uri, maxSide: Int): Bitmap? {
+    /**
+     * Decodes [uri] so its longer side is at most about [maxSide] pixels, upright.
+     * Throws with a readable reason instead of silently returning nothing.
+     */
+    fun load(context: Context, uri: Uri, maxSide: Int): Bitmap {
         val resolver = context.contentResolver
+        // NB: with inJustDecodeBounds decodeStream() always returns null - the size is in the options.
+        // (v2.4 treated that null as failure, so every photo in the in-app viewer stayed black.)
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) } ?: return null
-        val longest = maxOf(bounds.outWidth, bounds.outHeight)
-        if (longest <= 0) return null
-        var sample = 1
-        while (longest / (sample * 2) >= maxSide) sample *= 2
-        val opts = BitmapFactory.Options().apply { inSampleSize = sample }
-        val bmp = resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opts) } ?: return null
+        val opened = resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds); true } ?: false
+        if (!opened) throw IllegalStateException("無法開啟照片檔案")
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) throw IllegalStateException("照片檔案無法解碼")
+        var sample = ImageChecks.sampleSizeFor(bounds.outWidth, bounds.outHeight, maxSide)
+        var bmp: Bitmap? = null
+        while (bmp == null) {
+            val opts = BitmapFactory.Options().apply {
+                inSampleSize = sample
+                inPreferredConfig = Bitmap.Config.ARGB_8888
+            }
+            try {
+                bmp = resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opts) }
+                    ?: throw IllegalStateException("照片檔案無法解碼")
+            } catch (oom: OutOfMemoryError) {
+                if (sample >= 16) throw oom
+                sample *= 2
+            }
+        }
         val orientation = try {
             resolver.openInputStream(uri)?.use {
                 ExifInterface(it).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
@@ -161,9 +177,11 @@ object PhotoStore {
             else -> 0
         }
         if (deg == 0) return bmp
-        val m = Matrix().apply { postRotate(deg.toFloat()) }
-        val r = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, m, true)
-        if (r !== bmp) bmp.recycle()
-        return r
+        return try {
+            val m = Matrix().apply { postRotate(deg.toFloat()) }
+            val r = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, m, true)
+            if (r !== bmp) bmp.recycle()
+            r
+        } catch (_: OutOfMemoryError) { bmp }
     }
 }
