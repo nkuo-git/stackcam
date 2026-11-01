@@ -1,0 +1,22 @@
+<resources>
+    <style name="ModeButton">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:layout_marginStart">3dp</item>
+        <item name="android:layout_marginEnd">3dp</item>
+        <item name="android:button">@null</item>
+        <item name="android:background">@drawable/mode_bg</item>
+        <item name="android:gravity">center</item>
+        <item name="android:paddingTop">7dp</item>
+        <item name="android:paddingBottom">7dp</item>
+        <item name="android:textColor">@color/mode_text</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+    <style name="ZoomButton" parent="ModeButton">
+        <item name="android:layout_width">64dp</item>
+        <item name="android:layout_weight">0</item>
+        <item name="android:textSize">15sp</item>
+    </style>
+</resources>

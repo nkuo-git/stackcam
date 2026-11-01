@@ -7,22 +7,49 @@
         android:id="@+id/preview"
         android:layout_width="match_parent" android:layout_height="match_parent" />
 
+    <TextView android:id="@+id/zoomBadge"
+        android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:layout_gravity="top|center_horizontal" android:layout_marginTop="48dp"
+        android:background="#99000000" android:paddingStart="12dp" android:paddingEnd="12dp"
+        android:paddingTop="4dp" android:paddingBottom="4dp"
+        android:textColor="#FFC107" android:textSize="16sp" android:textStyle="bold"
+        android:visibility="gone" android:text="2x" />
+
     <LinearLayout
         android:layout_width="match_parent" android:layout_height="wrap_content"
         android:layout_gravity="bottom" android:orientation="vertical"
-        android:gravity="center_horizontal" android:background="#99000000"
+        android:gravity="center_horizontal" android:background="#B3000000"
+        android:paddingStart="8dp" android:paddingEnd="8dp"
         android:paddingTop="12dp" android:paddingBottom="28dp">
 
         <RadioGroup
             android:id="@+id/modeGroup"
-            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
             android:orientation="horizontal">
-            <RadioButton android:id="@+id/modeNormal" android:layout_width="wrap_content"
-                android:layout_height="wrap_content" android:checked="true"
-                android:text="一般疊圖 (8張)" android:textColor="#FFFFFF" android:layout_marginEnd="16dp"/>
-            <RadioButton android:id="@+id/modeNight" android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="夜景 (15張)" android:textColor="#FFFFFF"/>
+            <RadioButton android:id="@+id/modeNormal" style="@style/ModeButton"
+                android:checked="true" android:text="一般疊圖" />
+            <RadioButton android:id="@+id/modeNight" style="@style/ModeButton"
+                android:text="夜景" />
+            <RadioButton android:id="@+id/modeHdr" style="@style/ModeButton"
+                android:text="HDR\n強對比" />
+            <RadioButton android:id="@+id/modeSr" style="@style/ModeButton"
+                android:text="超解析\n變焦" />
+        </RadioGroup>
+
+        <TextView android:id="@+id/modeHint"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_marginTop="8dp" android:gravity="center"
+            android:textColor="#DDDDDD" android:textSize="13sp" />
+
+        <RadioGroup
+            android:id="@+id/zoomGroup"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_marginTop="8dp" android:orientation="horizontal"
+            android:visibility="gone">
+            <RadioButton android:id="@+id/zoom2" style="@style/ZoomButton"
+                android:checked="true" android:text="2x" />
+            <RadioButton android:id="@+id/zoom3" style="@style/ZoomButton"
+                android:text="3x" />
         </RadioGroup>
 
         <TextView android:id="@+id/status"
@@ -38,6 +65,6 @@
         <ImageButton android:id="@+id/shutter"
             android:layout_width="80dp" android:layout_height="80dp"
             android:layout_marginTop="10dp" android:background="@drawable/shutter"
-            android:contentDescription="Shutter"/>
+            android:contentDescription="快門"/>
     </LinearLayout>
 </FrameLayout>
