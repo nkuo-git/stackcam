@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:background="#000000">
+
+    <androidx.camera.view.PreviewView
+        android:id="@+id/preview"
+        android:layout_width="match_parent" android:layout_height="match_parent" />
+
+    <LinearLayout
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_gravity="bottom" android:orientation="vertical"
+        android:gravity="center_horizontal" android:background="#99000000"
+        android:paddingTop="12dp" android:paddingBottom="28dp">
+
+        <RadioGroup
+            android:id="@+id/modeGroup"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <RadioButton android:id="@+id/modeNormal" android:layout_width="wrap_content"
+                android:layout_height="wrap_content" android:checked="true"
+                android:text="一般疊圖 (8張)" android:textColor="#FFFFFF" android:layout_marginEnd="16dp"/>
+            <RadioButton android:id="@+id/modeNight" android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="夜景 (15張)" android:textColor="#FFFFFF"/>
+        </RadioGroup>
+
+        <TextView android:id="@+id/status"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:textColor="#FFFFFF" android:textSize="15sp"
+            android:layout_marginTop="8dp" android:text="拍照時請盡量拿穩" />
+
+        <ProgressBar android:id="@+id/progress"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="240dp" android:layout_height="wrap_content"
+            android:layout_marginTop="6dp" android:max="100" android:visibility="invisible"/>
+
+        <ImageButton android:id="@+id/shutter"
+            android:layout_width="80dp" android:layout_height="80dp"
+            android:layout_marginTop="10dp" android:background="@drawable/shutter"
+            android:contentDescription="Shutter"/>
+    </LinearLayout>
+</FrameLayout>
