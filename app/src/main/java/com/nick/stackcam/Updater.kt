@@ -32,8 +32,7 @@ class Updater(private val context: Context) {
 
     suspend fun check(): CheckResult = withContext(Dispatchers.IO) {
         try {
-            val conn = open(URL(API_URL))
-            conn.setRequestProperty("Accept", "application/vnd.github+json")
+            val conn = open(URL(API_URL), "application/vnd.github+json")
             try {
                 val code = conn.responseCode
                 when {
@@ -125,7 +124,7 @@ class Updater(private val context: Context) {
     }
 
     /** Opens a GET connection, following redirects manually (GitHub -> objects.githubusercontent.com). */
-    private fun open(start: URL): HttpURLConnection {
+    private fun open(start: URL, accept: String? = null): HttpURLConnection {
         var url = start
         repeat(6) {
             val c = url.openConnection() as HttpURLConnection
@@ -133,6 +132,7 @@ class Updater(private val context: Context) {
             c.connectTimeout = 15_000
             c.readTimeout = 30_000
             c.setRequestProperty("User-Agent", "StackCam/${BuildConfig.VERSION_NAME} (Android)")
+            if (accept != null) c.setRequestProperty("Accept", accept)
             val code = c.responseCode
             if (code in 300..399 && code != 304) {
                 val loc = c.getHeaderField("Location") ?: return c
