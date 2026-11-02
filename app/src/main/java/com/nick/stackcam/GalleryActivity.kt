@@ -121,6 +121,10 @@ class GalleryActivity : AppCompatActivity() {
     }
 
     private fun modeLabel(name: String): String = when {
+        name.contains("_NightA_") -> "夜景A 加強降噪"
+        name.contains("_NightB_") -> "夜景B RAW 合成"
+        name.contains("_NightC_") -> "夜景C 提亮色調"
+        name.contains("_NightD_") -> "夜景D RAW＋提亮"
         name.contains("_Night_") -> "夜景"
         name.contains("_HDR_") -> "HDR 強對比"
         name.contains("_SR2x_") -> "超解析 2x"

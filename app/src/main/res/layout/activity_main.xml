@@ -69,6 +69,21 @@
                 android:text="3x" />
         </RadioGroup>
 
+        <RadioGroup
+            android:id="@+id/nightGroup"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="8dp" android:layout_marginStart="24dp" android:layout_marginEnd="24dp"
+            android:orientation="horizontal" android:visibility="gone">
+            <RadioButton android:id="@+id/nightA" style="@style/VariantButton"
+                android:checked="true" android:text="A\n降噪" />
+            <RadioButton android:id="@+id/nightB" style="@style/VariantButton"
+                android:text="B\nRAW" />
+            <RadioButton android:id="@+id/nightC" style="@style/VariantButton"
+                android:text="C\n提亮" />
+            <RadioButton android:id="@+id/nightD" style="@style/VariantButton"
+                android:text="D\nRAW提亮" />
+        </RadioGroup>
+
         <TextView android:id="@+id/status"
             android:layout_width="wrap_content" android:layout_height="wrap_content"
             android:textColor="#FFFFFF" android:textSize="15sp"

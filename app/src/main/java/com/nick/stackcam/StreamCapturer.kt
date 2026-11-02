@@ -33,6 +33,11 @@ class StreamCapturer {
     data class Meta(
         val timeNs: Long?, val iso: Int?, val evIndex: Int?, val aeState: Int?,
         val focal: Float?, val aperture: Float?, val boost: Int? = null,
+        val focusDistance: Float? = null,
+        /** COLOR_CORRECTION_GAINS (R, G even, G odd, B) and COLOR_CORRECTION_TRANSFORM (row-major). */
+        val ccGains: FloatArray? = null, val ccm: FloatArray? = null,
+        /** SENSOR_NEUTRAL_COLOR_POINT (camera RGB of white). */
+        val neutral: FloatArray? = null,
     )
 
     class RawFrame(val nv21: ByteArray, val width: Int, val height: Int, val rotation: Int, val timestamp: Long)
@@ -56,6 +61,10 @@ class StreamCapturer {
                 result.get(CaptureResult.LENS_FOCAL_LENGTH),
                 result.get(CaptureResult.LENS_APERTURE),
                 result.get(CaptureResult.CONTROL_POST_RAW_SENSITIVITY_BOOST),
+                result.get(CaptureResult.LENS_FOCUS_DISTANCE),
+                result.get(CaptureResult.COLOR_CORRECTION_GAINS)?.let { floatArrayOf(it.red, it.greenEven, it.greenOdd, it.blue) },
+                result.get(CaptureResult.COLOR_CORRECTION_TRANSFORM)?.let { t -> FloatArray(9) { t.getElement(it % 3, it / 3).toFloat() } },
+                result.get(CaptureResult.SENSOR_NEUTRAL_COLOR_POINT)?.let { r -> FloatArray(3) { r[it].toFloat() } },
             )
             metas[ts] = m
             latestMeta = m

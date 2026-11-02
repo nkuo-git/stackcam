@@ -59,6 +59,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var status: TextView
     private lateinit var modeGroup: RadioGroup
     private lateinit var zoomGroup: RadioGroup
+    private lateinit var nightGroup: RadioGroup
     private lateinit var modeHint: TextView
     private lateinit var zoomBadge: TextView
     private lateinit var holdHint: TextView
@@ -70,6 +71,9 @@ class MainActivity : AppCompatActivity() {
     private val stream = StreamCapturer()
     private var imageCapture: ImageCapture? = null   // only in the fallback (legacy) capture path
     private var camera: Camera? = null
+    private var cameraProvider: ProcessCameraProvider? = null
+    private var cameraId: String? = null
+    private var rawSize: android.util.Size? = null    // null = no RAW on this camera
     private var streamFrameBytes = 0L               // bytes of one NV21 stream frame
     private var useLegacy = false
     private val cameraExecutor = Executors.newSingleThreadExecutor()
@@ -99,6 +103,14 @@ class MainActivity : AppCompatActivity() {
         status = findViewById(R.id.status)
         modeGroup = findViewById(R.id.modeGroup)
         zoomGroup = findViewById(R.id.zoomGroup)
+        nightGroup = findViewById(R.id.nightGroup)
+        val prefs = getSharedPreferences("stackcam", MODE_PRIVATE)
+        nightGroup.check(when (CaptureCore.NightVariant.of(prefs.getString("night_variant", "A"))) {
+            CaptureCore.NightVariant.A -> R.id.nightA
+            CaptureCore.NightVariant.B -> R.id.nightB
+            CaptureCore.NightVariant.C -> R.id.nightC
+            CaptureCore.NightVariant.D -> R.id.nightD
+        })
         modeHint = findViewById(R.id.modeHint)
         zoomBadge = findViewById(R.id.zoomBadge)
         holdHint = findViewById(R.id.holdHint)
@@ -112,6 +124,10 @@ class MainActivity : AppCompatActivity() {
         thumb.setOnClickListener { GalleryActivity.open(this, latestPhoto) }
         modeGroup.setOnCheckedChangeListener { _, _ -> updateModeUi(); refreshShutter() }
         zoomGroup.setOnCheckedChangeListener { _, _ -> updateModeUi(); refreshShutter() }
+        nightGroup.setOnCheckedChangeListener { _, _ ->
+            prefs.edit().putString("night_variant", currentVariant().code).apply()
+            updateModeUi(); refreshShutter()
+        }
         updateModeUi()
 
         observeQueue()
@@ -130,6 +146,7 @@ class MainActivity : AppCompatActivity() {
         val future = ProcessCameraProvider.getInstance(this)
         future.addListener({
             val provider = future.get()
+            cameraProvider = provider
             try {
                 bind(provider)
             } catch (e: Exception) {
@@ -173,6 +190,7 @@ class MainActivity : AppCompatActivity() {
             val maxJpeg = maxJpegPixels(cam)
             if (res != null && px >= 3_000_000 && (maxJpeg == 0L || px >= maxJpeg * 6 / 10)) {
                 camera = cam
+                detectRaw(cam)
                 streamFrameBytes = px * 3 / 2
                 status.text = "按下快門後拿穩約 1 秒"
                 return
@@ -191,7 +209,15 @@ class MainActivity : AppCompatActivity() {
         camera = provider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, preview, capture)
         imageCapture = capture
         streamFrameBytes = 0
+        camera?.let { detectRaw(it) }
         status.text = "拍照時請盡量拿穩"
+    }
+
+    private fun detectRaw(cam: Camera) {
+        val id = try { Camera2CameraInfo.from(cam.cameraInfo).cameraId } catch (_: Exception) { null }
+        cameraId = id
+        rawSize = id?.let { RawBurstCapturer.rawSize(this, it) }
+        updateModeUi()
     }
 
     private fun maxJpegPixels(cam: Camera): Long = try {
@@ -209,6 +235,16 @@ class MainActivity : AppCompatActivity() {
         else -> CaptureCore.Mode.NORMAL
     }
 
+    private fun currentVariant(): CaptureCore.NightVariant = when (nightGroup.checkedRadioButtonId) {
+        R.id.nightB -> CaptureCore.NightVariant.B
+        R.id.nightC -> CaptureCore.NightVariant.C
+        R.id.nightD -> CaptureCore.NightVariant.D
+        else -> CaptureCore.NightVariant.A
+    }
+
+    /** RAW variants need the fast stream path and a RAW-capable camera. */
+    private fun rawUsable() = rawSize != null && !useLegacy
+
     private fun zoomFactor(): Int = if (zoomGroup.checkedRadioButtonId == R.id.zoom3) 3 else 2
 
     private fun updateModeUi() {
@@ -216,10 +252,14 @@ class MainActivity : AppCompatActivity() {
         val n = CaptureCore.burstPlan(mode, zoomFactor()).frames
         modeHint.text = when (mode) {
             CaptureCore.Mode.NORMAL -> "快速連拍 $n 張疊合降噪，適合一般場景"
-            CaptureCore.Mode.NIGHT -> "連拍 $n 張，暗處降噪；請靠著東西拿穩"
+            CaptureCore.Mode.NIGHT -> nightHint()
             CaptureCore.Mode.HDR -> "白天強對比（逆光、窗邊、藍天＋陰影）\n拍 0 / -2 / +2 EV 各 2 張，亮部暗部都清楚"
             CaptureCore.Mode.SUPERRES -> "拍遠景：選倍率後連拍 $n 張，自然手震提供多張細節\n合成比直接放大更清楚"
         }
+        nightGroup.visibility = if (mode == CaptureCore.Mode.NIGHT) View.VISIBLE else View.GONE
+        val raw = rawUsable() || camera == null
+        findViewById<View>(R.id.nightB).alpha = if (raw) 1f else 0.45f
+        findViewById<View>(R.id.nightD).alpha = if (raw) 1f else 0.45f
         val sr = mode == CaptureCore.Mode.SUPERRES
         zoomGroup.visibility = if (sr) View.VISIBLE else View.GONE
         // Preview-only digital zoom: the camera keeps shooting the full sensor so we can crop
@@ -231,8 +271,22 @@ class MainActivity : AppCompatActivity() {
         zoomBadge.text = "超解析 ${zoomFactor()}x"
     }
 
+    private fun nightHint(): String {
+        val v = currentVariant()
+        val rawOk = rawUsable() || camera == null
+        val n = if (v.raw && rawOk) CaptureCore.RAW_FRAMES else CaptureCore.burstPlan(CaptureCore.Mode.NIGHT, 1).frames
+        val hold = if (v.raw && rawOk) "拿穩約 1 秒" else "拿穩約 0.5 秒"
+        val extra = if (v.raw && !rawOk) "\n（此裝置無法用 RAW，會改用夜景${v.nonRaw().code}）" else ""
+        return "${v.title}：${v.desc}\n連拍 $n 張，$hold$extra"
+    }
+
     private fun burstBytes(): Long {
-        val plan = CaptureCore.burstPlan(currentMode(), zoomFactor())
+        val mode = currentMode()
+        val rs = rawSize
+        if (mode == CaptureCore.Mode.NIGHT && currentVariant().raw && rs != null && rawUsable()) {
+            return CaptureCore.RAW_FRAMES.toLong() * rs.width * rs.height * 2 + streamFrameBytes
+        }
+        val plan = CaptureCore.burstPlan(mode, zoomFactor())
         val perFrame = if (streamFrameBytes > 0) streamFrameBytes else 6L * 1024 * 1024
         return perFrame * plan.frames
     }
@@ -246,6 +300,7 @@ class MainActivity : AppCompatActivity() {
         shutter.alpha = if (enabled) 1f else 0.4f
         for (i in 0 until modeGroup.childCount) modeGroup.getChildAt(i).isEnabled = !capturing
         for (i in 0 until zoomGroup.childCount) zoomGroup.getChildAt(i).isEnabled = !capturing
+        for (i in 0 until nightGroup.childCount) nightGroup.getChildAt(i).isEnabled = !capturing
         if (ready && !fits && ProcessingQueue.state.value.pending > 0) status.text = "上一張還在處理，請稍候再拍…"
         val keepOn = capturing || ProcessingQueue.state.value.pending > 0
         if (keepOn) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -335,6 +390,7 @@ class MainActivity : AppCompatActivity() {
         }
         val mode = currentMode()
         val zoom = zoomFactor()
+        val variant = currentVariant()
         capturing = true
         refreshShutter()
         progress.visibility = View.VISIBLE
@@ -346,7 +402,11 @@ class MainActivity : AppCompatActivity() {
             var ok = false
             try {
                 val t0 = System.currentTimeMillis()
-                val job = if (useLegacy) captureLegacy(mode, zoom) else captureStream(mode, zoom)
+                val job = when {
+                    mode == CaptureCore.Mode.NIGHT && variant.raw && rawUsable() -> captureRaw(variant)
+                    useLegacy -> captureLegacy(mode, zoom, variant)
+                    else -> captureStream(mode, zoom, variant)
+                }
                 val held = System.currentTimeMillis() - t0
                 showMoveNow()
                 ok = true
@@ -373,7 +433,51 @@ class MainActivity : AppCompatActivity() {
     }
 
     /** Fast path: grabs the burst from the running full-resolution stream. */
-    private suspend fun captureStream(mode: CaptureCore.Mode, zoom: Int): CaptureJob {
+    /**
+     * Night B / D: hands the camera from CameraX to a plain Camera2 RAW session for a fast RAW
+     * burst, then gives it back. On failure falls back to the non-RAW variant from the stream.
+     */
+    private suspend fun captureRaw(variant: CaptureCore.NightVariant): CaptureJob {
+        val provider = cameraProvider ?: throw IllegalStateException("相機尚未就緒")
+        val id = cameraId ?: throw IllegalStateException("相機尚未就緒")
+        // One live frame first: rotation, EXIF and the black-output safety net.
+        val pre = stream.burst(1, timeoutMs = 1500).firstOrNull()
+        val meta = stream.latestMeta
+        status.text = "切換到 RAW…請拿穩"
+        provider.unbindAll()
+        camera = null
+        val burst = try {
+            RawBurstCapturer(this).capture(id, CaptureCore.RAW_FRAMES, meta) { i -> onFrameCaptured(i, CaptureCore.RAW_FRAMES) }
+        } catch (e: Throwable) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+            // Back to the normal stream and shoot the non-RAW variant instead.
+            val why = if (e is OutOfMemoryError) "記憶體不足" else (e.message ?: e.javaClass.simpleName)
+            status.text = "RAW 失敗（$why），改用夜景${variant.nonRaw().code}，請繼續拿穩…"
+            startCamera()
+            awaitCamera()
+            val job = captureStream(CaptureCore.Mode.NIGHT, 1, variant.nonRaw())
+            job.note = "RAW 失敗（$why），改用夜景${variant.nonRaw().code}"
+            return job
+        }
+        startCamera()
+        val exif = HashMap(stream.exifOf(meta))
+        exif[androidx.exifinterface.media.ExifInterface.TAG_EXPOSURE_TIME] = "${(burst.exposureNs / 1000).coerceAtLeast(1)}/1000000"
+        exif[androidx.exifinterface.media.ExifInterface.TAG_PHOTOGRAPHIC_SENSITIVITY] = burst.iso.toString()
+        val refJpeg = pre?.let { p -> withContext(Dispatchers.Default) { NightProcessor.nv21ToJpeg(p.nv21, p.width, p.height) } }
+        return CaptureJob(
+            CaptureCore.Mode.NIGHT, 1, mutableListOf(), emptyList(), pre?.rotation ?: 90, exif,
+            variant = variant, raw = burst, refJpeg = refJpeg,
+        )
+    }
+
+    private suspend fun awaitCamera(timeoutMs: Long = 4000) {
+        val t0 = System.currentTimeMillis()
+        while (camera == null && System.currentTimeMillis() - t0 < timeoutMs) delay(50)
+        if (camera == null) throw IllegalStateException("相機重新啟動失敗")
+        delay(300) // let auto exposure settle on the new stream
+    }
+
+    private suspend fun captureStream(mode: CaptureCore.Mode, zoom: Int, variant: CaptureCore.NightVariant = CaptureCore.NightVariant.A): CaptureJob {
         val cam = camera ?: throw IllegalStateException("相機尚未就緒")
         val frames = ArrayList<StreamCapturer.RawFrame>()
         val groups = ArrayList<Int>()
@@ -441,6 +545,8 @@ class MainActivity : AppCompatActivity() {
         return CaptureJob(
             mode, zoom, frames.map { it.nv21 }.toMutableList(), groups, f0.rotation, exif,
             nv21Width = f0.width, nv21Height = f0.height,
+            variant = if (mode == CaptureCore.Mode.NIGHT) variant.nonRaw() else null,
+            note = if (mode == CaptureCore.Mode.NIGHT && variant.raw) "此裝置無法用 RAW，改用夜景${variant.nonRaw().code}" else null,
         )
     }
 
@@ -453,7 +559,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     /** Fallback path for devices that can't stream full resolution: one still capture at a time. */
-    private suspend fun captureLegacy(mode: CaptureCore.Mode, zoom: Int): CaptureJob {
+    private suspend fun captureLegacy(mode: CaptureCore.Mode, zoom: Int, variant: CaptureCore.NightVariant = CaptureCore.NightVariant.A): CaptureJob {
         val capture = imageCapture ?: throw IllegalStateException("相機尚未就緒")
         val cam = camera ?: throw IllegalStateException("相機尚未就緒")
         val frames = ArrayList<ByteArray>()
@@ -490,7 +596,11 @@ class MainActivity : AppCompatActivity() {
             }
         }
         val exif = PhotoStore.exifFromJpeg(frames[0])
-        return CaptureJob(mode, zoom, frames, groups, rotation, exif)
+        return CaptureJob(
+            mode, zoom, frames, groups, rotation, exif,
+            variant = if (mode == CaptureCore.Mode.NIGHT) variant.nonRaw() else null,
+            note = if (mode == CaptureCore.Mode.NIGHT && variant.raw) "相容模式無法用 RAW，改用夜景${variant.nonRaw().code}" else null,
+        )
     }
 
     private suspend fun takeOne(capture: ImageCapture): Pair<ByteArray, Int> =

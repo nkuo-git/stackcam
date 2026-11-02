@@ -11,6 +11,24 @@ object CaptureCore {
 
     enum class Mode { NORMAL, NIGHT, HDR, SUPERRES }
 
+    /** Night-mode variants the user can compare side by side. */
+    enum class NightVariant(val code: String, val label: String, val title: String, val desc: String, val raw: Boolean, val tone: Boolean, val exifName: String) {
+        A("A", "A\n降噪", "夜景A 加強降噪", "分區對齊＋依雜訊加權合成，再做保留邊緣的降噪", false, false, "Night A (tile-aligned noise-weighted merge)"),
+        B("B", "B\nRAW", "夜景B RAW 合成", "用未經處理的 RAW 疊圖，自己做白平衡、去馬賽克和色彩", true, false, "Night B (RAW merge)"),
+        C("C", "C\n提亮", "夜景C 提亮色調", "A 的合成＋暗部提亮、亮部保護、自然色彩", false, true, "Night C (merge + night tone mapping)"),
+        D("D", "D\nRAW提亮", "夜景D RAW＋提亮", "B 的 RAW 合成＋C 的提亮色調", true, true, "Night D (RAW merge + night tone mapping)");
+
+        /** What to use when RAW isn't available. */
+        fun nonRaw(): NightVariant = when (this) { B -> A; D -> C; else -> this }
+
+        companion object {
+            fun of(code: String?): NightVariant = values().firstOrNull { it.code == code } ?: A
+        }
+    }
+
+    /** RAW frames per night burst (RAW frames are 2 bytes/pixel, so fewer than the YUV burst). */
+    const val RAW_FRAMES = 8
+
     /**
      * How many frames to keep for a mode and how many stream frames to skip between them.
      * SUPERRES keeps every 2nd frame so natural hand shake spreads the frames over more sub-pixel

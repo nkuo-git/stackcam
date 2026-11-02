@@ -9,8 +9,8 @@ android {
         applicationId = "com.nick.stackcam"
         minSdk = 26
         targetSdk = 33
-        versionCode = 7
-        versionName = "2.5"
+        versionCode = 8
+        versionName = "2.6"
     }
     // Always sign with the same debug keystore so new APKs install over old ones (a backup lives in
     // /workspace/keystore-backup/debug.keystore; restore it to ~/.android/ if this machine is rebuilt).

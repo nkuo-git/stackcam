@@ -30,6 +30,14 @@ class CaptureJob(
     val exif: Map<String, String>,
     val nv21Width: Int = 0,
     val nv21Height: Int = 0,
+    /** Night variant (night mode only). */
+    val variant: CaptureCore.NightVariant? = null,
+    /** RAW burst (night B / D). [frames] is then empty. */
+    var raw: RawBurstCapturer.Burst? = null,
+    /** Reference frame as JPEG for the black-output safety net (night modes set this). */
+    var refJpeg: ByteArray? = null,
+    /** Extra note shown after saving (e.g. a RAW fallback). */
+    var note: String? = null,
 ) {
     val isNv21 get() = nv21Width > 0
     val rawBytesAtSubmit: Long = if (nv21Width > 0) frames.sumOf { it.size.toLong() } else 0L
@@ -84,14 +92,17 @@ object ProcessingQueue {
         ProcessingService.start(app)
         scope.launch {
             try {
-                if (job.isNv21) encodeLock.withLock { encode(job) }
+                // Night variants merge the NV21 frames directly (no lossy JPEG round trip).
+                if (job.isNv21 && job.mode != CaptureCore.Mode.NIGHT) encodeLock.withLock { encode(job) }
                 processLock.withLock { process(app, job) }
             } catch (e: OutOfMemoryError) {
                 fail("記憶體不足，這張沒有存成功。請等處理完再拍，或改用一般模式")
             } catch (e: Throwable) {
                 fail("處理失敗: ${e.message}")
             } finally {
+                if (job.isNv21 && job.mode == CaptureCore.Mode.NIGHT) rawInFlight.addAndGet(-job.rawBytesAtSubmit)
                 job.frames.clear()
+                job.raw = null
                 _state.update { it.copy(pending = (it.pending - 1).coerceAtLeast(0), progress = 0, message = "") }
             }
         }
@@ -120,15 +131,21 @@ object ProcessingQueue {
 
     private fun process(app: Context, job: CaptureJob) {
         val n = job.frames.size
+        val nightFrames = job.raw?.frames?.size ?: n
         val report: (Int, String) -> Unit = { p, msg -> _state.update { it.copy(progress = p, message = msg) } }
         // Keep the first frame (metered exposure, also in HDR) as a safety net; SR empties the list.
-        val refJpeg = job.frames.firstOrNull()
+        var refJpeg = if (job.mode == CaptureCore.Mode.NIGHT) null else job.frames.firstOrNull()
+        val variant = job.variant ?: CaptureCore.NightVariant.A
         var bitmap = when (job.mode) {
             CaptureCore.Mode.HDR -> HdrProcessor(report).process(job.frames, job.groups, job.rotation)
             CaptureCore.Mode.SUPERRES -> SuperResProcessor(job.zoom, report).process(job.frames, job.rotation)
-            else -> StackProcessor(job.mode == CaptureCore.Mode.NIGHT, report).process(job.frames, job.rotation)
+            CaptureCore.Mode.NIGHT -> try {
+                NightProcessor(variant, report).process(job)
+            } finally { refJpeg = job.refJpeg }
+            else -> StackProcessor(false, report).process(job.frames, job.rotation)
         }
         job.frames.clear()
+        job.raw = null
         var fellBack = false
         if (refJpeg != null && refJpeg.isNotEmpty()) {
             val mergedMean = BitmapUtil.meanLuma(bitmap)
@@ -147,18 +164,24 @@ object ProcessingQueue {
         report(97, "儲存中…")
         val tag = when (job.mode) {
             CaptureCore.Mode.NORMAL -> "Stack"
-            CaptureCore.Mode.NIGHT -> "Night"
+            CaptureCore.Mode.NIGHT -> "Night${variant.code}"
             CaptureCore.Mode.HDR -> "HDR"
             CaptureCore.Mode.SUPERRES -> "SR${job.zoom}x"
         }
-        val uri = try { PhotoStore.save(app, bitmap, tag, job.exif) } finally { bitmap.recycle() }
+        val exif = HashMap(job.exif)
+        if (job.mode == CaptureCore.Mode.NIGHT) {
+            val c = "StackCam ${BuildConfig.VERSION_NAME} ${variant.exifName}, $nightFrames frames" + (if (fellBack) ", fallback: reference frame" else "")
+            exif[androidx.exifinterface.media.ExifInterface.TAG_USER_COMMENT] = c
+            exif[androidx.exifinterface.media.ExifInterface.TAG_IMAGE_DESCRIPTION] = c
+        }
+        val uri = try { PhotoStore.save(app, bitmap, tag, exif) } finally { bitmap.recycle() }
         val what = when (job.mode) {
             CaptureCore.Mode.HDR -> "HDR，$n 張"
             CaptureCore.Mode.SUPERRES -> "超解析 ${job.zoom}x，$n 張"
-            CaptureCore.Mode.NIGHT -> "夜景，$n 張疊合"
+            CaptureCore.Mode.NIGHT -> "${variant.title}，$nightFrames 張"
             else -> "$n 張疊合"
         }
-        val result = if (fellBack) "已儲存（合成異常，改存單張原始影格）" else "已儲存（$what）"
+        val result = (if (fellBack) "已儲存（合成異常，改存單張原始影格）" else "已儲存（$what）") + (job.note?.let { "，$it" } ?: "")
         _state.update { it.copy(lastSaved = uri, savedSerial = it.savedSerial + 1, lastResult = result) }
     }
 }
